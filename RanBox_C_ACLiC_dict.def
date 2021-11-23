@@ -1,0 +1,17 @@
+NAME              "" WINDOWAPI
+
+VERSION           1.0
+
+HEAPSIZE  1048576,4096
+
+EXPORTS
+        G__cpp_dllrevRanBox_C_ACLiC_dict @1
+        G__set_cpp_environmentRanBox_C_ACLiC_dict @2
+        G__cpp_setup_tagtableRanBox_C_ACLiC_dict @3
+        G__cpp_setup_inheritanceRanBox_C_ACLiC_dict @4
+        G__cpp_setup_typetableRanBox_C_ACLiC_dict @5
+        G__cpp_setup_memvarRanBox_C_ACLiC_dict @6
+        G__cpp_setup_memfuncRanBox_C_ACLiC_dict @7
+        G__cpp_setup_globalRanBox_C_ACLiC_dict @8
+        G__cpp_setup_funcRanBox_C_ACLiC_dict @9
+        G__cpp_setupRanBox_C_ACLiC_dict @10

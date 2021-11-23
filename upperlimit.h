@@ -1,5 +1,4 @@
 
-// requires "TMath.h"
 
 // The (approximation) upper bound on the number of signal events we expect to see
 // if there is no signal.
