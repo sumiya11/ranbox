@@ -1,3 +1,4 @@
+
 #include "TFile.h"
 #include "TTree.h"
 #include "TCanvas.h"
@@ -774,7 +775,7 @@ void ascii_output(ofstream &results, ofstream &summary, ofstream &zpl, string ro
   results.open(asciifile.c_str());
   summary.open(summaryfile.c_str(), std::ios::out | std::ios::app);
   if (NH0 > 1)
-    zpl.open(zplfile, std::ios::out | std::ios::app);
+    zpl.open(zplfile.c_str(), std::ios::out | std::ios::app);
 
   results << "  ----------------------------- " << endl;
   results << "           R A N B O X   2 2    " << endl;
@@ -995,7 +996,14 @@ void RanBox(int dataset = 0, int Ntrials = 1000, int Nsignal = 200, int Nbackgro
 
   TH1 *h1 = new TH1D("h3", "R3", 100, 0.0, 10);
 
-  TH1 *h_sup = new TH1D("h3", "Sup", 100, 0.0, 10);
+  TH1 *h_sup = new TH1D("h3", "Sup", 100, 0.0, 100);
+  TH1 *h_sup_start = new TH1D("h3", "Sup initial", 100, 0.0, 100);
+
+  TH1 *h_vol = new TH1D("h3", "Volume", 100, 0.0, 0.005);
+  TH1 *h_vol_start = new TH1D("h3", "Volume initial", 100, 0.0, 0.005);
+
+  TH1 *h_ts = new TH1D("h3", "TS", 100, 0.0, 0.5);
+  TH1 *h_ts_start = new TH1D("h3", "TS initial", 100, 0.0, 0.5);
 
   //dimensions
   // ------------------------------------------------------------------------------
@@ -2124,7 +2132,7 @@ principal->~TPrincipal();
 
     for (; gd < maxGDLoops; gd++)
     {
-
+      
       determineSB(Sidemin, Sidemax, Blockmin, Blockmax, Nvar);
       determinesecondSB(secondsidemin, secondsidemax, Sidemin, Sidemax, Nvar);
       VolumeOrig = 1.;
@@ -2140,6 +2148,8 @@ principal->~TPrincipal();
       sbbratio = SidebandsVolume / VolumeOrig;
       secsbbratio = SecondsidebandsVolume / VolumeOrig;
       // store ratios
+
+      /*
       if (sbbratio != 2 || secsbbratio != 3)
         cout << "ratio[2] = " << sbbratio << ", ratio[3] = " << secsbbratio << endl;
 
@@ -2154,6 +2164,8 @@ principal->~TPrincipal();
         cout << "secsmin = " << secondsidemin[k] << "; secsbmax = " << secondsidemax[k] << endl;
         cout << "******************" << endl;
       }
+      */
+
       doloop = false;
       gd2 = gd;
       Nin = 0;   // events in original box
@@ -2378,6 +2390,7 @@ principal->~TPrincipal();
           }
         } // k loop on Nvar
 
+
         // Determine if event is in modified box or sideband
         // -------------------------------------------------
         for (int k = 0; k < Nvar; k++)
@@ -2465,6 +2478,13 @@ principal->~TPrincipal();
         }
       }
 
+      if (gd == 0) {
+          cout << "at start : " << in_ << " / " << side_++ << '\n';
+          h_sup_start->Fill(Sup(Nside));
+          h_vol_start->Fill(VolumeOrig);
+          h_ts_start->Fill(Sup(Nside) / (Nin));
+      }
+
       if (gd == 0)
       {
         Initial_density = log((double)Nin / VolumeOrig / goodevents);
@@ -2538,7 +2558,10 @@ principal->~TPrincipal();
 
       // Compute Z-value of hyp that Nin is compatible with box volume, in Poisson approx.
       // --------------------------------------------------------------------------------
-      Zval = {0., 0., 0., 0., 0., 0., 0.};
+      for (int uwu = 0; uwu < 7; uwu++)
+      {
+        Zval[uwu] = 0;
+      }
       Zval_start = 0;
       if (c_ZPL_R2_SvsBKG == 0)
       {
@@ -2583,10 +2606,21 @@ principal->~TPrincipal();
       }
       else if (c_ZPL_R2_SvsBKG == 3)
       { // Upper Limit Test statistic !
-        Nexp = Nside;
-        double eff = Nin / Nsignal;
-        Zval_start = UpperLimitTS(Sup(Nexp), eff);
+        double eff = ((double)Nin) / Nsignal;
+        if (eff > 0) {
+          Nexp = Nside;
+          Zval_start = -UpperLimitTS(Sup(Nexp), eff);
+        } else {
+          Nexp = Nside;
+          Zval_start = -bignumber;
+        }
       }
+
+      double eff = ((double)Nin) / Nsignal;
+      Nexp = Nside;
+      cout << "iter " << gd << ", Nexp = " << Nexp << 
+            ", eff = " << eff << '\n';
+
     }
     // Starting values before box move
     if (gd == 0)
@@ -2644,12 +2678,17 @@ principal->~TPrincipal();
               Nexp = VolumeMod[k][m] * goodevents;
               Zval[m] = SvsBKGnosb(Nin_grad[k][m], goodevents, VolumeMod[k][m], SecondsidebandsVolume); // il controllo su tale variabile è all'if qui sotto
             }
-          }
-          else if (c_ZPL_R2_SvsBKG == 3)
+          } else if (c_ZPL_R2_SvsBKG == 3)
           { // Upper Limit Test statistic !
-            Nexp = Nside_grad[k][m];
-            double eff = Nin / Nsignal;
-            Zval[m] = UpperLimitTS(Sup(Nexp), eff);
+            double eff = ((double) Nin_grad[k][m]) / Nsignal;
+            if (eff > 0) {
+              Nexp = Nside_grad[k][m];
+              Zval[m] = -UpperLimitTS(Sup(Nexp), eff);
+            } else {
+              Nexp = Nside_grad[k][m];
+              Zval[m] = -bignumber;
+            }
+            // cout << "Move [" << m << "], TS = " <<  Zval[m] << " , eff = " << eff << '\n';
           }
 
           if (debug)
@@ -2837,22 +2876,160 @@ principal->~TPrincipal();
       } // end if igrad =/!= -1
     }   // end move
 
+    double ThisVolume = 1.;
+    for (int k = 0; k < Nvar; k++)
+    {
+      ThisVolume = ThisVolume * (Blockmax[k] - Blockmin[k]);
+    }
+
+    // ### HERE I CAN SLIDE THE R1 R2 CALCULATIONS, because now everything in the box is collected
+    sbbratio = SidebandsVolume / VolumeOrig;
+    secsbbratio = SecondsidebandsVolume / VolumeOrig;
+    if (Nsidebest != 0 && Ninbest != 0)
+    {
+      Ratio1 = Ninbest / (Nsidebest * (SidebandsVolume - VolumeOrig) / VolumeOrig);
+      h1->Fill(Ratio1);
+      cout << "iteration " << trial << ", R1 = " << Ratio1 << endl;
+    }
+    // h_sup->Fill(Sup(Nsidebest * (SidebandsVolume - VolumeOrig) / VolumeOrig));
+    // cout << "iteration " << trial << ", Sup = " << Sup(Nsidebest * (SidebandsVolume - VolumeOrig) / VolumeOrig) << endl; 
+
+    if (Zval_best < Zvalbest)
+    {
+      Zval_best = Zvalbest;
+      Nin_best = Ninbest;
+      Nexp_best = Nexpbest;
+      gd_best = gd2;
+      trial_best = trial;
+      ID_best = Initial_density;
+      for (int k = 0; k < Nvar; k++)
+      {
+        Ivar_best[k] = Ivar[k];
+        // The boundaries are the best ones as they get updated every time igrad!=-1
+        Blockmin_best[k] = Blockmin[k];
+        Blockmax_best[k] = Blockmax[k];
+      }
+      if (debug)
+        cout << "Updated values: " << Zval_best << " " << Nin_best
+             << " " << Nexp_best << endl;
+
+      // ### HERE I CAN SLIDE THE R1 R2 CALCULATIONS WITH THE BEST VARIABLES
+
+      // Printout
+      int NSignalInBox = 0;
+      if (Nsignal > 0)
+      {
+        for (int i = 0; i < goodevents; i++)
+        {
+          if (isSignal[i])
+          {
+            bool NotIn = false;
+            for (int k = 0; k < Nvar && !NotIn; k++)
+            {
+              double position = (0.5 + order_ind[Ivar_best[k]][i]) / goodevents; // pos of ev in this var
+              if (position <= Blockmin_best[k] || position > Blockmax_best[k])
+              {
+                NotIn = true;
+              }
+            }
+            if (!NotIn)
+              NSignalInBox++;
+          }
+        }
+        double sbgain = 0;
+        if (Nin_best > 0)
+          sbgain = ((double)NSignalInBox / (double)Nin_best) * goodevents / (double)Nsignal;
+        cout << "  Z=" << Zval_best << " Nin, Nexp = " << Nin_best << ", "
+             << Nexp_best;
+        cout << " - SFR= " << (double)NSignalInBox / Nsignal * 100. << " - "
+             << "Ns_in = " << NSignalInBox;
+        cout << "; vars = ";
+        for (int k = 0; k < Nvar; k++)
+        {
+          cout << Ivar[k] << " ";
+        }
+        cout << " - SB gain = " << sbgain << endl
+             << endl;
+        ;
+        results << "  Trial " << trial << ": Z = " << Zval_best << "; Nin, Nexp = "
+                << Nin_best << ", " << Nexp_best;
+        results << " - Ns_in = " << NSignalInBox << "; SFR = "
+                << (double)NSignalInBox / Nsignal * 100.
+                << "; vars= ";
+        for (int k = 0; k < Nvar; k++)
+        {
+          results << Ivar[k] << " ";
+        }
+        results << " - SB gain = " << sbgain << endl
+                << endl;
+        ;
+      }
+
+      NSignalInBox = 0;
+      if (Nsignal > 0)
+      {
+        //if ((mock && Gaussian_dims>0) || fakefrac>0) {
+        for (int i = 0; i < goodevents; i++)
+        {
+          if (isSignal[i])
+          {
+            bool NotIn = false;
+            for (int k = 0; k < Nvar && !NotIn; k++)
+            {
+              double position = (0.5 + order_ind[Ivar_best[k]][i]) / goodevents; // pos of ev in this var
+              if (position <= Blockmin_best[k] || position > Blockmax_best[k])
+              {
+                NotIn = true;
+              }
+            }
+            if (!NotIn)
+              NSignalInBox++;
+          }
+        }
+        cout << "  Caught " << (double)NSignalInBox / Nsignal * 100. << " % of injected signal" << endl;
+      }
+
+      // h_sup->Fill(Sup(Nexp_best));
+
+      cout << "OOOO " << NSignalInBox << ", Best : " << Nexp_best << " / " << Nin_best << " / " << Zval_best << '\n';
+
+    } // Zval_best updated
+
+    // h_sup->Fill(Sup(Nexpbest));
+    h_sup->Fill(Sup(Nin_best));
+    h_vol->Fill(ThisVolume);
+    h_ts->Fill(Sup(Nin_best) / Nin_best);
+
+    // h_sup->Fill(Sup(Nexp_best));
+    cout << "Nexp_best = " << Nexp_best << ", Sup = " << Sup(Nexp_best) << '\n';
+    
+    // HERE WE FILL Sup;
+
+    // h_sup->Fill(Sup(Nexp_best));
+
+    // cout << "Nexp_best = " << Nexp_best << ", Sup = " << Sup(Nexp_best) << '\n';
+
   } // end of gd loop /////////////////////////////////////////////////////////////////
 
   // Check for subspace result
   // -------------------------
+  /*
   double ThisVolume = 1.;
   for (int k = 0; k < Nvar; k++)
   {
     ThisVolume = ThisVolume * (Blockmax[k] - Blockmin[k]);
   }
+  */
   // Fill variables to keep track of results
   // ---------------------------------------
+
+  /*
   BoxVol[trial] = ThisVolume;
   BoxNin[trial] = Ninbest;
   BoxNex[trial] = Nsidebest;
   BoxZpl[trial] = Zvalbest;
   BoxInd[trial] = trial;
+  
   for (int k = 0; k < Nvar; k++)
   {
     BoxVar[trial][k] = Ivar[k];
@@ -2902,8 +3079,8 @@ principal->~TPrincipal();
   else
   {
     cout << endl;
-  }
-
+  }*/
+  /*
   // HERE WE FILL Sup;
   h_sup->Fill(Sup(Nexp_best));
 
@@ -2915,7 +3092,7 @@ principal->~TPrincipal();
     Ratio1 = Ninbest / (Nsidebest * (SidebandsVolume - VolumeOrig) / VolumeOrig);
     h1->Fill(Ratio1);
     cout << "iteration " << trial << ", R1 = " << Ratio1 << endl;
-  }
+  }*/
   /*
  	if (N2sb !=0 && Ninbest !=0) { 
 	 Ratio2 = Ninbest/(N2sb*(SecondsidebandsVolume-2.*VolumeOrig)/VolumeOrig);
@@ -2930,6 +3107,7 @@ principal->~TPrincipal();
 	*/
   // If this is a better box than all others, adjourn vars
   // -----------------------------------------------------
+  /*
   if (Zval_best < Zvalbest)
   {
     Zval_best = Zvalbest;
@@ -3001,7 +3179,8 @@ principal->~TPrincipal();
       ;
     }
   } // Zval_best updated
-
+  */
+  /*
   Ninbox_fi->Fill(Ninbest);
   Ninbox_in_vs_fi->Fill(Nin0, Ninbest);
   NGDsteps->Fill((double)gd2);
@@ -3084,9 +3263,10 @@ if (Nsignal > 0)
   Aver_1s_contained += ndimin;
   Aver2_1s_contained += pow(ndimin, 2);
 }
+*/
 
-//} // End Test of Cluster, Ntestseed loop - turn on if needed
-/*    
+  //} // End Test of Cluster, Ntestseed loop - turn on if needed
+  /*    
 if (mock && NseedTrials>1) { // Nseed tests only for toy data  
   Aver_SF_caught     = Aver_SF_caught/NseedTrials;
   Aver2_SF_caught    = Aver2_SF_caught/NseedTrials;
@@ -3105,7 +3285,7 @@ if (mock && NseedTrials>1) { // Nseed tests only for toy data
       cout << endl << endl;
 }
 */
-
+  /*
 NSignalInBox = 0;
 if (Nsignal > 0)
 {
@@ -3129,20 +3309,20 @@ if (Nsignal > 0)
   }
   cout << "  Caught " << (double)NSignalInBox / Nsignal * 100. << " % of injected signal" << endl;
 }
-
-for (int k = 0; k < Nvar; k++)
-{
-  if (mock)
+*/
+  for (int k = 0; k < Nvar; k++)
   {
-    cout << "  Var " << Ivar_best[k] << ":" << varname_mock[Ivar_best[k]] << " Original bounds: [" << Blockmin_best[k] << "," << Blockmax_best[k] << "]" << endl;
+    if (mock)
+    {
+      cout << "  Var " << Ivar_best[k] << ":" << varname_mock[Ivar_best[k]] << " Original bounds: [" << Blockmin_best[k] << "," << Blockmax_best[k] << "]" << endl;
+    }
+    else
+    {
+      cout << "  Var " << Ivar_best[k] << ":" << varname[Ivar_best[k]] << " Original bounds: [" << Blockmin_best[k] << "," << Blockmax_best[k] << "]" << endl;
+    }
   }
-  else
-  {
-    cout << "  Var " << Ivar_best[k] << ":" << varname[Ivar_best[k]] << " Original bounds: [" << Blockmin_best[k] << "," << Blockmax_best[k] << "]" << endl;
-  }
-}
 
-/*    
+  /*    
     //////////////////////////////////////////////////////////////////
     // Only for toys:  determine absolute optimal box boundaries
     // Here we assume that Gaussian_dims>Nvar, and compute the 
@@ -3191,7 +3371,7 @@ for (int k = 0; k < Nvar; k++)
 	      << " Nobs = " << Nobs_maxZ << " Nexp = " << Nexp_maxZ << "; x = " << x_maxZ << " Z = " << maxZ << endl;
     }
 */
-
+  /*
 cout << endl;
 if (NH0 > 1)
   cout << "  H0 test # " << IH0 << endl;
@@ -3203,8 +3383,11 @@ if (NH0 > 1)
 results << "  Best Z after " << gd_best << " loops = " << 0.1 * (int)(10 * Zval_best) << " Nin = " << Nin_best << " Nexp = " << 0.01 * (int)(100 * Nexp_best) << " Initial Dens. = " << 0.01 * (int)(100 * ID_best);
 results << endl;
 
-// Summary printout
-// ----------------
+*/
+  // Summary printout
+  // ----------------
+
+  /*
 if (IH0 == 0)
   summary << "id= " << id << " NAD=" << NAD << " NSEL=" << NSEL << " PCA=" << PCA << " RF=" << RegFactor;
 if (IH0 == 0 && mock)
@@ -3231,244 +3414,249 @@ for (int ivar = 0; ivar < Nvar; ivar++)
 }
 summary << endl;
 
-// Printout of best boxes, if Signal>0
-// -----------------------------------
-if (Nsignal > 0)
-{
-  for (int times = 0; times < Ntrials; times++)
+*/
+
+  // Printout of best boxes, if Signal>0
+  // -----------------------------------
+  if (Nsignal > 0)
   {
-    for (int i = Ntrials - 1; i > 0; i--)
+    for (int times = 0; times < Ntrials; times++)
     {
-      if (BoxZpl[BoxInd[i]] > BoxZpl[BoxInd[i - 1]])
+      for (int i = Ntrials - 1; i > 0; i--)
       {
-        int tmp = BoxInd[i];
-        BoxInd[i] = BoxInd[i - 1];
-        BoxInd[i - 1] = tmp;
+        if (BoxZpl[BoxInd[i]] > BoxZpl[BoxInd[i - 1]])
+        {
+          int tmp = BoxInd[i];
+          BoxInd[i] = BoxInd[i - 1];
+          BoxInd[i - 1] = tmp;
+        }
       }
     }
-  }
-  for (int i = 0; i < 20 && i < Ntrials; i++)
-  {
-    int ind = BoxInd[i];
-    double sbgain = 0;
-    sbgain = 0.01 * BoxSFr[ind] / BoxNin[ind] * goodevents;
-    cout << "  Z=" << 0.01 * (int)(100 * BoxZpl[ind])
-         << "  Nin=" << BoxNin[ind]
-         << "  Nex=" << 0.01 * (int)(BoxNex[ind] * 100)
-         << "  Ns=" << 0.1 * (int)(10 * BoxSFr[ind] * Nsignal / 100.)
-         << "  V=" << 0.0001 * (int)(10000 * BoxVol[ind])
-         << "  SF=" << 0.1 * (int)(10 * BoxSFr[ind])
-         << "  SBg= " << sbgain << "  Vars= ";
-    for (int ivar = 0; ivar < Nvar; ivar++)
+    for (int i = 0; i < 20 && i < Ntrials; i++)
     {
-      cout << " " << BoxVar[ind][ivar];
+      int ind = BoxInd[i];
+      double sbgain = 0;
+      sbgain = 0.01 * BoxSFr[ind] / BoxNin[ind] * goodevents;
+      cout << "  Z=" << 0.01 * (int)(100 * BoxZpl[ind])
+           << "  Nin=" << BoxNin[ind]
+           << "  Nex=" << 0.01 * (int)(BoxNex[ind] * 100)
+           << "  Ns=" << 0.1 * (int)(10 * BoxSFr[ind] * Nsignal / 100.)
+           << "  V=" << 0.0001 * (int)(10000 * BoxVol[ind])
+           << "  SF=" << 0.1 * (int)(10 * BoxSFr[ind])
+           << "  SBg= " << sbgain << "  Vars= ";
+      for (int ivar = 0; ivar < Nvar; ivar++)
+      {
+        cout << " " << BoxVar[ind][ivar];
+      }
+      cout << endl;
+      results << "  Z=" << 0.01 * (int)(100 * BoxZpl[ind])
+              << "  Nin=" << BoxNin[ind]
+              << "  Nex=" << 0.01 * (int)(BoxNex[ind] * 100)
+              << "  Ns=" << 0.1 * (int)(10 * BoxSFr[ind] * Nsignal / 100.)
+              << "  V=" << 0.0001 * (int)(10000 * BoxVol[ind])
+              << "  SF=" << 0.1 * (int)(10 * BoxSFr[ind])
+              << "  SBg= " << sbgain << "  Vars= ";
+      for (int ivar = 0; ivar < Nvar; ivar++)
+      {
+        results << " " << BoxVar[ind][ivar];
+      }
+      results << endl;
     }
-    cout << endl;
-    results << "  Z=" << 0.01 * (int)(100 * BoxZpl[ind])
-            << "  Nin=" << BoxNin[ind]
-            << "  Nex=" << 0.01 * (int)(BoxNex[ind] * 100)
-            << "  Ns=" << 0.1 * (int)(10 * BoxSFr[ind] * Nsignal / 100.)
-            << "  V=" << 0.0001 * (int)(10000 * BoxVol[ind])
-            << "  SF=" << 0.1 * (int)(10 * BoxSFr[ind])
-            << "  SBg= " << sbgain << "  Vars= ";
-    for (int ivar = 0; ivar < Nvar; ivar++)
-    {
-      results << " " << BoxVar[ind][ivar];
-    }
-    results << endl;
-  }
-} ///////////////
-summary << endl
-        << endl;
+  } ///////////////
+  summary << endl
+          << endl;
 
+  /*
 if (NH0 > 1)
 {
   zpl << Zval_best << "\t\t" << NSignalInBox << endl;
 }
-// End loop on IH0, if testing NH0 datasets for test statistic distributions under the null
-// ----------------------------------------------------------------------------------------
+*/
 
-ZH0->Fill(BoxZpl[trial_best]); // if (PCA && NH0>1) principal();
-//; // end IH0 loop IH0 = 1
+  // End loop on IH0, if testing NH0 datasets for test statistic distributions under the null
+  // ----------------------------------------------------------------------------------------
 
-//delete [] PB_all;
-//delete [] PointedBy;
-//delete [] BoxVar;
+  ZH0->Fill(BoxZpl[trial_best]); // if (PCA && NH0>1) principal();
+  //; // end IH0 loop IH0 = 1
 
-////////////////////////////////////////////////////////////////////////////////////////////
-// Construct plots of marginals for the considered features in the best box
-// ------------------------------------------------------------------------
-Double_t *dataP = new Double_t[ND];
-Double_t *dataX = new Double_t[ND];
+  //delete [] PB_all;
+  //delete [] PointedBy;
+  //delete [] BoxVar;
 
-if (plots)
-{
+  ////////////////////////////////////////////////////////////////////////////////////////////
+  // Construct plots of marginals for the considered features in the best box
+  // ------------------------------------------------------------------------
+  Double_t *dataP = new Double_t[ND];
+  Double_t *dataX = new Double_t[ND];
 
-  int Nbins1D = 50;
-  if (goodevents < 4000)
-    Nbins1D = 25;
-  char nameplotal[30];
-  char nameplotin[30];
-  char nameplotex[30];
-  char nameplotsi[30];
-  double sidew = 0.5 / Nbins1D;
-  // original vars live in NAD space (box selection after PCA backtransform spans full space)
-  for (int k = 0; k < NAD; k++)
+  if (plots)
   {
-    sprintf(nameplotal, "OPlot_al%d", k);
-    sprintf(nameplotin, "OPlot_in%d", k);
-    sprintf(nameplotsi, "OPlot_si%d", k);
-    double xmin = OXmin[k]; // (1.+sidew)*OXmin[k]-sidew*OXmax[k];
-    double xmax = OXmax[k]; // (1.+sidew)*OXmax[k]-sidew*OXmin[k];
-    OPlot_al[k] = new TH1D(nameplotal, nameplotal, Nbins1D, xmin, xmax);
-    OPlot_in[k] = new TH1D(nameplotin, nameplotin, Nbins1D, xmin, xmax);
-    OPlot_si[k] = new TH1D(nameplotsi, nameplotsi, Nbins1D, xmin, xmax);
-    OPlot_in[k]->SetFillColor(kGreen);
-    OPlot_in[k]->SetLineColor(kGreen);
-    OPlot_al[k]->SetLineColor(kBlue);
-    OPlot_si[k]->SetLineColor(kBlack);
-    OPlot_si[k]->SetLineWidth(2);
-    OPlot_al[k]->SetLineWidth(2);
-    OPlot_in[k]->SetLineWidth(2);
 
-    sprintf(nameplotal, "Plot_al%d", k);
-    sprintf(nameplotin, "Plot_in%d", k);
-    sprintf(nameplotex, "Plot_ex%d", k);
-    sprintf(nameplotsi, "Plot_si%d", k);
-    xmin = Xmin[Ivar_best[k]]; // (1.+sidew)*Xmin[Ivar_best[k]]-sidew*Xmax[Ivar_best[k]];
-    xmax = Xmax[Ivar_best[k]]; // (1.+sidew)*Xmax[Ivar_best[k]]-sidew*Xmin[Ivar_best[k]];
-    Plot_al[k] = new TH1D(nameplotal, nameplotal, Nbins1D, xmin, xmax);
-    Plot_in[k] = new TH1D(nameplotin, nameplotin, Nbins1D, xmin, xmax);
-    Plot_ex[k] = new TH1D(nameplotex, nameplotex, Nbins1D, xmin, xmax);
-    Plot_si[k] = new TH1D(nameplotsi, nameplotsi, Nbins1D, xmin, xmax);
-    Plot_in[k]->SetFillColor(kGreen);
-    Plot_in[k]->SetLineColor(kGreen);
-    Plot_al[k]->SetLineColor(kBlue);
-    Plot_ex[k]->SetFillColor(kRed);
-    Plot_ex[k]->SetLineColor(kRed);
-    Plot_si[k]->SetLineColor(kBlack);
-    Plot_si[k]->SetLineWidth(2);
-    Plot_in[k]->SetLineWidth(2);
-    Plot_ex[k]->SetLineWidth(2);
-    Plot_al[k]->SetLineWidth(2);
-
-    sprintf(nameplotal, "UPlot_al%d", k);
-    sprintf(nameplotin, "UPlot_in%d", k);
-    sprintf(nameplotex, "UPlot_ex%d", k);
-    sprintf(nameplotsi, "UPlot_si%d", k);
-    UPlot_al[k] = new TH1D(nameplotal, nameplotal, Nbins1D, 0., 1.); // -sidew, 1.+sidew);
-    UPlot_in[k] = new TH1D(nameplotin, nameplotin, Nbins1D, 0., 1.); // -sidew, 1.+sidew);
-    UPlot_ex[k] = new TH1D(nameplotex, nameplotex, Nbins1D, 0., 1.); // -sidew, 1.+sidew);
-    UPlot_si[k] = new TH1D(nameplotsi, nameplotsi, Nbins1D, 0., 1.); // -sidew, 1.+sidew);
-    UPlot_in[k]->SetFillColor(kGreen);
-    UPlot_al[k]->SetLineColor(kBlue);
-    UPlot_ex[k]->SetFillColor(kRed);
-    UPlot_in[k]->SetLineColor(kGreen);
-    UPlot_ex[k]->SetLineColor(kRed);
-    UPlot_si[k]->SetLineColor(kBlack);
-    UPlot_si[k]->SetLineWidth(2);
-    UPlot_in[k]->SetLineWidth(2);
-    UPlot_ex[k]->SetLineWidth(2);
-    UPlot_al[k]->SetLineWidth(2);
-  }
-
-  // Fill 1D plots
-  // -------------
-  double pos;
-  int Nin1 = 0;
-  int NUin1 = 0;
-
-  for (int i = 0; i < goodevents; i++)
-  {
-    // If we did PCA, we want also the untransformed vars
-    // --------------------------------------------------
-    for (int dim = 0; dim < NAD; dim++)
-    {
-      dataP[dim] = feature[dim][i];
-      if (!PCA)
-        dataX[dim] = dataP[dim];
-    }
-    // if (PCA) P2X(dataP,dataX,NAD);
-    // Can now use dataX as original feature
-    int Uin1_ = 0;
-    for (int kk = 0; kk < Nvar; kk++)
-    {
-      pos = (0.5 + order_ind[Ivar_best[kk]][i]) / goodevents;
-      if (pos > Blockmin_best[kk] && pos <= Blockmax_best[kk])
-      {
-        Uin1_++;
-      }
-    }
-    // Original vars in NAD space
+    int Nbins1D = 50;
+    if (goodevents < 4000)
+      Nbins1D = 25;
+    char nameplotal[30];
+    char nameplotin[30];
+    char nameplotex[30];
+    char nameplotsi[30];
+    double sidew = 0.5 / Nbins1D;
+    // original vars live in NAD space (box selection after PCA backtransform spans full space)
     for (int k = 0; k < NAD; k++)
     {
-      OPlot_al[k]->Fill(dataX[k]);
-      if (Uin1_ == Nvar)
-      {
-        OPlot_in[k]->Fill(dataX[k]);
-        if (isSignal[i])
-          OPlot_si[k]->Fill(dataX[k]);
-      }
+      sprintf(nameplotal, "OPlot_al%d", k);
+      sprintf(nameplotin, "OPlot_in%d", k);
+      sprintf(nameplotsi, "OPlot_si%d", k);
+      double xmin = OXmin[k]; // (1.+sidew)*OXmin[k]-sidew*OXmax[k];
+      double xmax = OXmax[k]; // (1.+sidew)*OXmax[k]-sidew*OXmin[k];
+      OPlot_al[k] = new TH1D(nameplotal, nameplotal, Nbins1D, xmin, xmax);
+      OPlot_in[k] = new TH1D(nameplotin, nameplotin, Nbins1D, xmin, xmax);
+      OPlot_si[k] = new TH1D(nameplotsi, nameplotsi, Nbins1D, xmin, xmax);
+      OPlot_in[k]->SetFillColor(kGreen);
+      OPlot_in[k]->SetLineColor(kGreen);
+      OPlot_al[k]->SetLineColor(kBlue);
+      OPlot_si[k]->SetLineColor(kBlack);
+      OPlot_si[k]->SetLineWidth(2);
+      OPlot_al[k]->SetLineWidth(2);
+      OPlot_in[k]->SetLineWidth(2);
+
+      sprintf(nameplotal, "Plot_al%d", k);
+      sprintf(nameplotin, "Plot_in%d", k);
+      sprintf(nameplotex, "Plot_ex%d", k);
+      sprintf(nameplotsi, "Plot_si%d", k);
+      xmin = Xmin[Ivar_best[k]]; // (1.+sidew)*Xmin[Ivar_best[k]]-sidew*Xmax[Ivar_best[k]];
+      xmax = Xmax[Ivar_best[k]]; // (1.+sidew)*Xmax[Ivar_best[k]]-sidew*Xmin[Ivar_best[k]];
+      Plot_al[k] = new TH1D(nameplotal, nameplotal, Nbins1D, xmin, xmax);
+      Plot_in[k] = new TH1D(nameplotin, nameplotin, Nbins1D, xmin, xmax);
+      Plot_ex[k] = new TH1D(nameplotex, nameplotex, Nbins1D, xmin, xmax);
+      Plot_si[k] = new TH1D(nameplotsi, nameplotsi, Nbins1D, xmin, xmax);
+      Plot_in[k]->SetFillColor(kGreen);
+      Plot_in[k]->SetLineColor(kGreen);
+      Plot_al[k]->SetLineColor(kBlue);
+      Plot_ex[k]->SetFillColor(kRed);
+      Plot_ex[k]->SetLineColor(kRed);
+      Plot_si[k]->SetLineColor(kBlack);
+      Plot_si[k]->SetLineWidth(2);
+      Plot_in[k]->SetLineWidth(2);
+      Plot_ex[k]->SetLineWidth(2);
+      Plot_al[k]->SetLineWidth(2);
+
+      sprintf(nameplotal, "UPlot_al%d", k);
+      sprintf(nameplotin, "UPlot_in%d", k);
+      sprintf(nameplotex, "UPlot_ex%d", k);
+      sprintf(nameplotsi, "UPlot_si%d", k);
+      UPlot_al[k] = new TH1D(nameplotal, nameplotal, Nbins1D, 0., 1.); // -sidew, 1.+sidew);
+      UPlot_in[k] = new TH1D(nameplotin, nameplotin, Nbins1D, 0., 1.); // -sidew, 1.+sidew);
+      UPlot_ex[k] = new TH1D(nameplotex, nameplotex, Nbins1D, 0., 1.); // -sidew, 1.+sidew);
+      UPlot_si[k] = new TH1D(nameplotsi, nameplotsi, Nbins1D, 0., 1.); // -sidew, 1.+sidew);
+      UPlot_in[k]->SetFillColor(kGreen);
+      UPlot_al[k]->SetLineColor(kBlue);
+      UPlot_ex[k]->SetFillColor(kRed);
+      UPlot_in[k]->SetLineColor(kGreen);
+      UPlot_ex[k]->SetLineColor(kRed);
+      UPlot_si[k]->SetLineColor(kBlack);
+      UPlot_si[k]->SetLineWidth(2);
+      UPlot_in[k]->SetLineWidth(2);
+      UPlot_ex[k]->SetLineWidth(2);
+      UPlot_al[k]->SetLineWidth(2);
     }
 
-    // PCA and UNIF space use Nvar
-    for (int k = 0; k < Nvar; k++)
+    // Fill 1D plots
+    // -------------
+    double pos;
+    int Nin1 = 0;
+    int NUin1 = 0;
+
+    for (int i = 0; i < goodevents; i++)
     {
-      Plot_al[k]->Fill(dataP[Ivar_best[k]]);
-      pos = (0.5 + order_ind[Ivar_best[k]][i]) / goodevents;
-      UPlot_al[k]->Fill(pos);
-      // Fill plots for n cuts
-      if (Uin1_ == Nvar)
+      // If we did PCA, we want also the untransformed vars
+      // --------------------------------------------------
+      for (int dim = 0; dim < NAD; dim++)
       {
-        Plot_in[k]->Fill(dataP[Ivar_best[k]]);
-        if (isSignal[i])
-          Plot_si[k]->Fill(dataP[Ivar_best[k]]);
+        dataP[dim] = feature[dim][i];
+        if (!PCA)
+          dataX[dim] = dataP[dim];
       }
-      if (Uin1_ == Nvar)
-      {
-        UPlot_in[k]->Fill(pos);
-        if (isSignal[i])
-          UPlot_si[k]->Fill(pos);
-      }
-      // Now fill plots of n-1 cuts
-      int Uin2_ = 0;
+      // if (PCA) P2X(dataP,dataX,NAD);
+      // Can now use dataX as original feature
+      int Uin1_ = 0;
       for (int kk = 0; kk < Nvar; kk++)
       {
-        if (kk != k)
+        pos = (0.5 + order_ind[Ivar_best[kk]][i]) / goodevents;
+        if (pos > Blockmin_best[kk] && pos <= Blockmax_best[kk])
         {
-          pos = (0.5 + order_ind[Ivar_best[kk]][i]) / goodevents;
-          if (pos > Blockmin_best[kk] && pos <= Blockmax_best[kk])
-            Uin2_++;
+          Uin1_++;
         }
       }
-      if (Uin2_ == Nvar - 1)
+      // Original vars in NAD space
+      for (int k = 0; k < NAD; k++)
       {
-        Plot_ex[k]->Fill(dataP[Ivar_best[k]]);
+        OPlot_al[k]->Fill(dataX[k]);
+        if (Uin1_ == Nvar)
+        {
+          OPlot_in[k]->Fill(dataX[k]);
+          if (isSignal[i])
+            OPlot_si[k]->Fill(dataX[k]);
+        }
       }
-      pos = (0.5 + order_ind[Ivar_best[k]][i]) / goodevents;
-      if (Uin2_ == Nvar - 1)
-        UPlot_ex[k]->Fill(pos);
-    } // end k
-    if (Uin1_ == Nvar)
-      NUin1++;
-  }
 
-  // Scatterplots now
-  // ----------------
-  char nameplot2al[30];
-  char nameplot2in[30];
-  char nameplot2ex[30];
-  int ind = 0;
-  int Nbins2D = 20;
-  sidew = 0.5 / Nbins2D;
-  for (int k = 0; k < Nvar - 1; k++)
-  {
-    for (int kk = k + 1; kk < Nvar; kk++)
+      // PCA and UNIF space use Nvar
+      for (int k = 0; k < Nvar; k++)
+      {
+        Plot_al[k]->Fill(dataP[Ivar_best[k]]);
+        pos = (0.5 + order_ind[Ivar_best[k]][i]) / goodevents;
+        UPlot_al[k]->Fill(pos);
+        // Fill plots for n cuts
+        if (Uin1_ == Nvar)
+        {
+          Plot_in[k]->Fill(dataP[Ivar_best[k]]);
+          if (isSignal[i])
+            Plot_si[k]->Fill(dataP[Ivar_best[k]]);
+        }
+        if (Uin1_ == Nvar)
+        {
+          UPlot_in[k]->Fill(pos);
+          if (isSignal[i])
+            UPlot_si[k]->Fill(pos);
+        }
+        // Now fill plots of n-1 cuts
+        int Uin2_ = 0;
+        for (int kk = 0; kk < Nvar; kk++)
+        {
+          if (kk != k)
+          {
+            pos = (0.5 + order_ind[Ivar_best[kk]][i]) / goodevents;
+            if (pos > Blockmin_best[kk] && pos <= Blockmax_best[kk])
+              Uin2_++;
+          }
+        }
+        if (Uin2_ == Nvar - 1)
+        {
+          Plot_ex[k]->Fill(dataP[Ivar_best[k]]);
+        }
+        pos = (0.5 + order_ind[Ivar_best[k]][i]) / goodevents;
+        if (Uin2_ == Nvar - 1)
+          UPlot_ex[k]->Fill(pos);
+      } // end k
+      if (Uin1_ == Nvar)
+        NUin1++;
+    }
+
+    // Scatterplots now
+    // ----------------
+    char nameplot2al[30];
+    char nameplot2in[30];
+    char nameplot2ex[30];
+    int ind = 0;
+    int Nbins2D = 20;
+    sidew = 0.5 / Nbins2D;
+    for (int k = 0; k < Nvar - 1; k++)
     {
-      sprintf(nameplot2al, "SCP_al%d", ind);
-      sprintf(nameplot2in, "SCP_in%d", ind);
-      sprintf(nameplot2ex, "SCP_ex%d", ind);
-      /*
+      for (int kk = k + 1; kk < Nvar; kk++)
+      {
+        sprintf(nameplot2al, "SCP_al%d", ind);
+        sprintf(nameplot2in, "SCP_in%d", ind);
+        sprintf(nameplot2ex, "SCP_ex%d", ind);
+        /*
 	SCP_al[ind] = new TH2D(nameplot2al, nameplot2al, Nbins2D, 
 			       (1.+sidew)*Xmin[Ivar_best[k]]-sidew*Xmax[Ivar_best[k]], 
 			       (1.+sidew)*Xmax[Ivar_best[k]]-sidew*Xmin[Ivar_best[k]], 
@@ -3488,10 +3676,10 @@ if (plots)
 	SCP_ex[ind]->SetLineColor(kRed);	
   */
 
-      sprintf(nameplot2al, "USCP_al%d", ind);
-      sprintf(nameplot2in, "USCP_in%d", ind);
-      sprintf(nameplot2ex, "USCP_ex%d", ind);
-      /*
+        sprintf(nameplot2al, "USCP_al%d", ind);
+        sprintf(nameplot2in, "USCP_in%d", ind);
+        sprintf(nameplot2ex, "USCP_ex%d", ind);
+        /*
 	USCP_al[ind] = new TH2D (nameplot2al, nameplot2al, Nbins2D, -sidew, 1.+sidew, 
 				 Nbins2D, -sidew, 1.+sidew);
 	USCP_in[ind] = new TH2D (nameplot2in, nameplot2in, Nbins2D, -sidew, 1.+sidew, 
@@ -3504,7 +3692,7 @@ if (plots)
 	sprintf(nameplot2al,"OSCP_al%d",ind);
 	sprintf(nameplot2in,"OSCP_in%d",ind);
   */
-      /*
+        /*
 	OSCP_al[ind] = new TH2D(nameplot2al, nameplot2al, Nbins2D, 
 				(1.+sidew)*OXmin[Ivar_best[k]]-sidew*OXmax[Ivar_best[k]], 
 				(1.+sidew)*OXmax[Ivar_best[k]]-sidew*OXmin[Ivar_best[k]], 
@@ -3518,71 +3706,43 @@ if (plots)
 	OSCP_in[ind]->SetLineColor(kGreen);
   */
 
-      ind++;
-    }
-  }
-
-  // Fill scatterplots
-  // -----------------
-  for (int i = 0; i < goodevents; i++)
-  {
-    // If we did PCA, we want also the untransformed vars
-    // --------------------------------------------------
-    for (int dim = 0; dim < NAD; dim++)
-    {
-      dataP[dim] = feature[dim][i];
-      if (!PCA)
-        dataX[dim] = dataP[dim];
-    }
-    // if (PCA) P2X(dataP,dataX,NAD);
-    // Can now use dataX as original feature
-
-    // Untransformed var scatterplots - NB variables are scrambled by PCA if used
-    // --------------------------------------------------------------------------
-    int Uin_ = 0;
-    for (int kkk = 0; kkk < Nvar; kkk++)
-    {
-      pos = (0.5 + order_ind[Ivar_best[kkk]][i]) / goodevents;
-      if (pos > Blockmin_best[kkk] && pos <= Blockmax_best[kkk])
-      {
-        Uin_++;
+        ind++;
       }
     }
-    ind = 0;
-    for (int k = 0; k < Nvar - 1; k++)
-    {
-      for (int kk = k + 1; kk < Nvar; kk++)
-      {
-        Uin_ = 0;
-        for (int kkk = 0; kkk < Nvar; kkk++)
-        {
-          pos = (0.5 + order_ind[Ivar_best[kkk]][i]) / goodevents;
-          if (pos > Blockmin_best[kkk] && pos <= Blockmax_best[kkk])
-          {
-            Uin_++;
-          }
-        }
-        double posx = (0.5 + order_ind[Ivar_best[k]][i]) / goodevents;
-        double posy = (0.5 + order_ind[Ivar_best[kk]][i]) / goodevents;
-        /*
-	  SCP_al[ind]->Fill(feature[Ivar_best[k]][i],feature[Ivar_best[kk]][i]);
-	  USCP_al[ind]->Fill(posx, posy);
-	  OSCP_al[ind]->Fill(dataX[Ivar_best[k]],dataX[Ivar_best[kk]]);
-	  */
-        if (Uin_ == Nvar)
-        {
-          SCP_in[ind]->Fill(feature[Ivar_best[k]][i],
-                            feature[Ivar_best[kk]][i]);
-          USCP_in[ind]->Fill(posx, posy);
-          OSCP_in[ind]->Fill(dataX[Ivar_best[k]], dataX[Ivar_best[kk]]);
-        }
 
-        // Fill plots for n-2 cuts
-        // -----------------------
-        Uin_ = 0;
-        for (int kkk = 0; kkk < Nvar; kkk++)
+    // Fill scatterplots
+    // -----------------
+    for (int i = 0; i < goodevents; i++)
+    {
+      // If we did PCA, we want also the untransformed vars
+      // --------------------------------------------------
+      for (int dim = 0; dim < NAD; dim++)
+      {
+        dataP[dim] = feature[dim][i];
+        if (!PCA)
+          dataX[dim] = dataP[dim];
+      }
+      // if (PCA) P2X(dataP,dataX,NAD);
+      // Can now use dataX as original feature
+
+      // Untransformed var scatterplots - NB variables are scrambled by PCA if used
+      // --------------------------------------------------------------------------
+      int Uin_ = 0;
+      for (int kkk = 0; kkk < Nvar; kkk++)
+      {
+        pos = (0.5 + order_ind[Ivar_best[kkk]][i]) / goodevents;
+        if (pos > Blockmin_best[kkk] && pos <= Blockmax_best[kkk])
         {
-          if (kkk != k && kkk != kk)
+          Uin_++;
+        }
+      }
+      ind = 0;
+      for (int k = 0; k < Nvar - 1; k++)
+      {
+        for (int kk = k + 1; kk < Nvar; kk++)
+        {
+          Uin_ = 0;
+          for (int kkk = 0; kkk < Nvar; kkk++)
           {
             pos = (0.5 + order_ind[Ivar_best[kkk]][i]) / goodevents;
             if (pos > Blockmin_best[kkk] && pos <= Blockmax_best[kkk])
@@ -3590,409 +3750,460 @@ if (plots)
               Uin_++;
             }
           }
-        }
-        if (Uin_ == Nvar - 2)
-        {
-          SCP_ex[ind]->Fill(feature[Ivar_best[k]][i],
-                            feature[Ivar_best[kk]][i]);
-          USCP_ex[ind]->Fill(posx, posy);
-        }
+          double posx = (0.5 + order_ind[Ivar_best[k]][i]) / goodevents;
+          double posy = (0.5 + order_ind[Ivar_best[kk]][i]) / goodevents;
+          /*
+	  SCP_al[ind]->Fill(feature[Ivar_best[k]][i],feature[Ivar_best[kk]][i]);
+	  USCP_al[ind]->Fill(posx, posy);
+	  OSCP_al[ind]->Fill(dataX[Ivar_best[k]],dataX[Ivar_best[kk]]);
+	  */
+          if (Uin_ == Nvar)
+          {
+            SCP_in[ind]->Fill(feature[Ivar_best[k]][i],
+                              feature[Ivar_best[kk]][i]);
+            USCP_in[ind]->Fill(posx, posy);
+            OSCP_in[ind]->Fill(dataX[Ivar_best[k]], dataX[Ivar_best[kk]]);
+          }
 
-        ind++; // scatterplot index
+          // Fill plots for n-2 cuts
+          // -----------------------
+          Uin_ = 0;
+          for (int kkk = 0; kkk < Nvar; kkk++)
+          {
+            if (kkk != k && kkk != kk)
+            {
+              pos = (0.5 + order_ind[Ivar_best[kkk]][i]) / goodevents;
+              if (pos > Blockmin_best[kkk] && pos <= Blockmax_best[kkk])
+              {
+                Uin_++;
+              }
+            }
+          }
+          if (Uin_ == Nvar - 2)
+          {
+            SCP_ex[ind]->Fill(feature[Ivar_best[k]][i],
+                              feature[Ivar_best[kk]][i]);
+            USCP_ex[ind]->Fill(posx, posy);
+          }
+
+          ind++; // scatterplot index
+        }
       }
     }
+
+    // Draw all the stuff now. First, free up some memory
+    // --------------------------------------------------
+    delete[] feature;
+    delete[] feature_all;
+    delete[] order_ind;
+    delete[] order_ind_all;
+
+    // Plot chosen features for all events and chosen events - 1D plots
+    // ----------------------------------------------------------------
+    int NADplot = NAD;
+    if (NADplot > 30)
+      NADplot = 30; // can't have too many
+
+    PP = new TCanvas("PP", "PP", 1000, 700);
+    if (Nvar < 7)
+    {
+      PP->Divide(3, 2);
+    }
+    else if (Nvar < 9)
+    {
+      PP->Divide(4, 2);
+    }
+    else if (Nvar == 9)
+    {
+      PP->Divide(3, 3);
+    }
+    else if (Nvar < 11)
+    {
+      PP->Divide(5, 2);
+    }
+    else if (Nvar < 13)
+    {
+      PP->Divide(4, 3);
+    }
+    else if (Nvar < 16)
+    {
+      PP->Divide(5, 3);
+    }
+    else if (Nvar == 16)
+    {
+      PP->Divide(4, 4);
+    }
+    else
+    {
+      PP->Divide(5, 4);
+    }
+    OP = new TCanvas("OP", "OP", 1000, 700);
+    if (NADplot < 16)
+    {
+      OP->Divide(5, 3);
+    }
+    else if (NADplot == 16)
+    {
+      OP->Divide(4, 4);
+    }
+    else if (NADplot < 21)
+    {
+      OP->Divide(5, 4);
+    }
+    else
+    {
+      OP->Divide(6, 5);
+    }
+    UP = new TCanvas("UP", "", 1000, 700);
+    if (Nvar < 7)
+    {
+      UP->Divide(3, 2);
+    }
+    else if (Nvar < 9)
+    {
+      UP->Divide(4, 2);
+    }
+    else if (Nvar == 9)
+    {
+      UP->Divide(3, 3);
+    }
+    else if (Nvar < 11)
+    {
+      UP->Divide(5, 2);
+    }
+    else if (Nvar < 13)
+    {
+      UP->Divide(4, 3);
+    }
+    else if (Nvar < 16)
+    {
+      UP->Divide(5, 3);
+    }
+    else if (Nvar == 16)
+    {
+      UP->Divide(4, 4);
+    }
+    else
+    {
+      UP->Divide(5, 4);
+    }
+    P2 = new TCanvas("P2", "", 1000, 700);
+    OP2 = new TCanvas("OP2", "", 1000, 700);
+    UP2 = new TCanvas("UP2", "", 1000, 700);
+
+    for (int k = 0; k < Nvar; k++)
+    {
+      // Get histogram boundary
+      double m1 = Plot_ex[k]->GetMaximum();
+      double m2 = 0;
+      if (Plot_al[k]->Integral() > 0 && Plot_in[k]->Integral() > 0)
+        Plot_al[k]->Scale(Plot_in[k]->Integral() / Plot_al[k]->Integral());
+      m2 = Plot_al[k]->GetMaximum();
+      if (m1 < m2)
+        m1 = m2;
+      Plot_ex[k]->SetMaximum(1.1 * m1);
+      // Plot them
+      PP->cd(k + 1);
+      Plot_ex[k]->Draw();
+      Plot_in[k]->Draw("SAME");
+      Plot_si[k]->Draw("SAME");
+      Plot_al[k]->Draw("SAME");
+    }
+
+    for (int k = 0; k < NADplot; k++)
+    {
+      // Get histogram boundary
+      double m1 = OPlot_in[k]->GetMaximum();
+      double m2 = 0;
+      if (OPlot_al[k]->Integral() > 0 && OPlot_in[k]->Integral() > 0)
+        OPlot_al[k]->Scale(OPlot_in[k]->Integral() / OPlot_al[k]->Integral());
+      m2 = OPlot_al[k]->GetMaximum();
+      if (m1 < m2)
+        m1 = m2;
+      OPlot_in[k]->SetMaximum(1.1 * m1);
+      // Plot them
+      OP->cd(k + 1);
+      OPlot_in[k]->Draw();
+      OPlot_si[k]->Draw("SAME");
+      OPlot_al[k]->Draw("SAME");
+    }
+
+    for (int k = 0; k < Nvar; k++)
+    {
+      // Get histogram boundary
+      double m1 = UPlot_ex[k]->GetMaximum();
+      double m2 = 0;
+      if (UPlot_al[k]->Integral() > 0 && UPlot_in[k]->Integral() > 0)
+        UPlot_al[k]->Scale(UPlot_in[k]->Integral() / UPlot_al[k]->Integral());
+      m2 = UPlot_al[k]->GetMaximum();
+      if (m1 < m2)
+        m1 = m2;
+      UPlot_ex[k]->SetMaximum(1.1 * m1);
+      // Plot them
+      UP->cd(k + 1);
+      UPlot_ex[k]->Draw();
+      UPlot_in[k]->Draw("SAME");
+      UPlot_si[k]->Draw("SAME");
+      UPlot_al[k]->Draw("SAME");
+    }
+
+    // Plot chosen features for all events and chosen events - 2D plots
+    // ----------------------------------------------------------------
+    if (ind > 98)
+      ind = 98; // max number of plots
+    if (ind <= 15)
+    {
+      P2->Divide(6, 5);
+    }
+    else if (ind <= 30)
+    {
+      P2->Divide(10, 6);
+    }
+    else if (ind <= 50)
+    {
+      P2->Divide(10, 10);
+    }
+    else
+    {
+      P2->Divide(14, 15); // max is 15x14 variables to plot
+    }
+    for (int i = 0; i < ind; i++)
+    {
+      P2->cd(2 * i + 1);
+      SCP_al[i]->Draw("BOX");
+      P2->cd(2 * i + 2);
+      SCP_ex[i]->Draw("BOX");
+      SCP_in[i]->Draw("BOXSAME");
+    }
+
+    if (ind <= 15)
+    {
+      OP2->Divide(6, 5);
+    }
+    else if (ind <= 30)
+    {
+      OP2->Divide(10, 6);
+    }
+    else if (ind <= 50)
+    {
+      OP2->Divide(10, 10);
+    }
+    else
+    {
+      OP2->Divide(14, 15); // max is 15x14 variables to plot
+    }
+    for (int i = 0; i < ind; i++)
+    {
+      OP2->cd(2 * i + 1);
+      OSCP_al[i]->Draw("BOX");
+      OP2->cd(2 * i + 2);
+      OSCP_in[i]->Draw("BOXSAME");
+    }
+
+    if (ind <= 15)
+    {
+      UP2->Divide(6, 5);
+    }
+    else if (ind <= 30)
+    {
+      UP2->Divide(10, 6);
+    }
+    else if (ind <= 50)
+    {
+      UP2->Divide(10, 10);
+    }
+    else
+    {
+      UP2->Divide(14, 15);
+    }
+    for (int i = 0; i < ind; i++)
+    {
+      UP2->cd(2 * i + 1);
+      USCP_al[i]->Draw("BOX");
+      UP2->cd(2 * i + 2);
+      USCP_ex[i]->Draw("BOX");
+      USCP_in[i]->Draw("BOXSAME");
+    }
+
+    TCanvas *Vars = new TCanvas("Vars", "", 500, 500);
+    Vars->Divide(3, 4);
+    Vars->cd(1);
+    Zvalue_in->Draw();
+    Vars->cd(2);
+    Zvalue_fi->Draw();
+    Vars->cd(3);
+    InitialDensity->Draw();
+    Vars->cd(4);
+    NClomax->Draw();
+    Vars->cd(5);
+    Bounds_in->Draw();
+    Vars->cd(6);
+    Bounds_fi->Draw();
+    Vars->cd(7);
+    Drift->Draw();
+    Vars->cd(8);
+    NGDsteps->Draw();
+    Vars->cd(9);
+    Ninbox_in->Draw();
+    Ninbox_fi->SetLineColor(kRed);
+    Ninbox_fi->Draw("SAME");
+    Vars->cd(10);
+    Ninbox_in_vs_fi->Draw();
+    Vars->cd(11);
+    InitialDensity->Draw();
+    Vars->cd(12);
+    InitialVolume->Draw();
+
+    // Write histograms to root file
+    // -----------------------------
+    TFile *out = new TFile(rootfile.c_str(), "RECREATE");
+    out->cd();
+    Zvalue_in->Write();
+    Zvalue_fi->Write();
+    Bounds_in->Write();
+    Bounds_fi->Write();
+    Drift->Write();
+    NGDsteps->Write();
+    Ninbox_in->Write();
+    Ninbox_fi->Write();
+    Ninbox_in_vs_fi->Write();
+    InitialDensity->Write();
+    InitialVolume->Write();
+    NClomax->Write();
+    ZH0->Write();
+    ZvsOrder->Write();
+    //Z_maxR->Write();
+    //maxR_vs_Z->Write();
+
+    for (int k = 0; k < NAD; k++)
+    {
+      Plot_al[k]->Write();
+      Plot_in[k]->Write();
+      Plot_ex[k]->Write();
+      Plot_si[k]->Write();
+      UPlot_al[k]->Write();
+      UPlot_in[k]->Write();
+      UPlot_ex[k]->Write();
+      UPlot_si[k]->Write();
+      OPlot_al[k]->Write();
+      OPlot_in[k]->Write();
+      OPlot_si[k]->Write();
+    }
+    for (int k = 0; k < Nvar * (Nvar - 1) / 2; k++)
+    {
+      SCP_al[k]->Write();
+      SCP_in[k]->Write();
+      SCP_ex[k]->Write();
+      USCP_al[k]->Write();
+      USCP_in[k]->Write();
+      USCP_ex[k]->Write();
+      OSCP_al[k]->Write();
+      OSCP_in[k]->Write();
+    }
+    // Canvases now
+    PP->Write();
+    OP->Write();
+    UP->Write();
+    P2->Write();
+    OP2->Write();
+    UP2->Write();
+    Vars->Write();
+
+    // Close root file
+    // ---------------
+    out->Close();
+
+  } // end if plots
+
+  // Plot test statistic if requested
+  // --------------------------------
+  if (NH0 > 1)
+  {
+    TCanvas *H0 = new TCanvas("H0", "", 500, 300);
+    H0->cd();
+    ZH0->Draw();
+
+    // Determine quantiles of TS
+    // -------------------------
+    int s = 0;
+    double alpha = 0.05;
+    double centrmin = 0.1586;
+    double centrmax = 0.8414;
+    double centr = 0.5;
+    double integral = 0.;
+    double x = 0.;
+    double xcmin = 0.;
+    double xcmax = 0.;
+    double xc = 0.;
+    double xalpha = 0.;
+    for (int ix = 0; ix < 1000; ix++)
+    {
+      s += ZH0->GetBinContent(ix + 1);
+      x = 0.1 * ix;
+      if (s >= NH0 * centrmin && xcmin == 0.)
+        xcmin = x;
+      if (s >= NH0 * centr && xc == 0.)
+        xc = x;
+      if (s >= NH0 * centrmax && xcmax == 0.)
+        xcmax = x;
+      if (s >= NH0 * (1 - alpha) && xalpha == 0.)
+        xalpha = x;
+    }
+    cout << endl;
+    cout << "  Central interval of Z distribution: [" << xcmin << " " << xc << " " << xcmax << "]" << endl;
+    cout << "  Critical region: Z> " << xalpha << endl;
+    cout << "  Mean Z = " << ZH0->GetMean() << " +- " << ZH0->GetRMS() / sqrt(NH0 - 1) << endl;
+    cout << endl;
+    results << endl;
+    results << "  id = " << id;
+    results << "  Central interval of Z distribution: [" << xcmin << " " << xc << " " << xcmax << "]" << endl;
+    results << "  Critical region: Z> " << xalpha << endl;
+    results << "  Mean Z = " << ZH0->GetMean() << " +- " << ZH0->GetRMS() / sqrt(NH0 - 1) << endl;
+    results << endl;
+    summary << endl;
+    summary << "  id = " << id;
+    summary << "  Central interval of Z distribution: [" << xcmin << " " << xc << " " << xcmax << "]" << endl;
+    summary << "  Critical region: Z> " << xalpha << endl;
+    summary << "  Mean Z = " << ZH0->GetMean() << " +- " << ZH0->GetRMS() / sqrt(NH0 - 1) << endl;
+    summary << endl;
   }
 
-  // Draw all the stuff now. First, free up some memory
-  // --------------------------------------------------
-  delete[] feature;
-  delete[] feature_all;
-  delete[] order_ind;
-  delete[] order_ind_all;
+  results.close();
+  summary.close();
 
-  // Plot chosen features for all events and chosen events - 1D plots
-  // ----------------------------------------------------------------
-  int NADplot = NAD;
-  if (NADplot > 30)
-    NADplot = 30; // can't have too many
+  // here it's plotted the R1 statistic
+  TCanvas *c1 = new TCanvas("c1", "canv1", 600, 400);
+  c1->cd();
+  h_sup->Draw();
 
-  PP = new TCanvas("PP", "PP", 1000, 700);
-  if (Nvar < 7)
-  {
-    PP->Divide(3, 2);
-  }
-  else if (Nvar < 9)
-  {
-    PP->Divide(4, 2);
-  }
-  else if (Nvar == 9)
-  {
-    PP->Divide(3, 3);
-  }
-  else if (Nvar < 11)
-  {
-    PP->Divide(5, 2);
-  }
-  else if (Nvar < 13)
-  {
-    PP->Divide(4, 3);
-  }
-  else if (Nvar < 16)
-  {
-    PP->Divide(5, 3);
-  }
-  else if (Nvar == 16)
-  {
-    PP->Divide(4, 4);
-  }
-  else
-  {
-    PP->Divide(5, 4);
-  }
-  OP = new TCanvas("OP", "OP", 1000, 700);
-  if (NADplot < 16)
-  {
-    OP->Divide(5, 3);
-  }
-  else if (NADplot == 16)
-  {
-    OP->Divide(4, 4);
-  }
-  else if (NADplot < 21)
-  {
-    OP->Divide(5, 4);
-  }
-  else
-  {
-    OP->Divide(6, 5);
-  }
-  UP = new TCanvas("UP", "", 1000, 700);
-  if (Nvar < 7)
-  {
-    UP->Divide(3, 2);
-  }
-  else if (Nvar < 9)
-  {
-    UP->Divide(4, 2);
-  }
-  else if (Nvar == 9)
-  {
-    UP->Divide(3, 3);
-  }
-  else if (Nvar < 11)
-  {
-    UP->Divide(5, 2);
-  }
-  else if (Nvar < 13)
-  {
-    UP->Divide(4, 3);
-  }
-  else if (Nvar < 16)
-  {
-    UP->Divide(5, 3);
-  }
-  else if (Nvar == 16)
-  {
-    UP->Divide(4, 4);
-  }
-  else
-  {
-    UP->Divide(5, 4);
-  }
-  P2 = new TCanvas("P2", "", 1000, 700);
-  OP2 = new TCanvas("OP2", "", 1000, 700);
-  UP2 = new TCanvas("UP2", "", 1000, 700);
+  //TCanvas *c2 = new TCanvas("c2", "canv2", 600, 400);
+  //c2->cd();
+  h_sup_start->SetLineColor(kRed);
+  h_sup_start->Draw("SAME");
+
+  TCanvas *c3 = new TCanvas("c3", "canv3", 600, 400);
+  c3->cd();
+  h_vol->Draw();
+
+  //TCanvas *c4 = new TCanvas("c4", "canv4", 600, 400);
+  //c4->cd();
+  h_vol_start->SetLineColor(kRed);
+  h_vol_start->Draw("SAME");
+
+  TCanvas *c5 = new TCanvas("c5", "canv5", 600, 400);
+  c5->cd();
+  h_ts->Draw();
+
+  //TCanvas *c6 = new TCanvas("c6", "canv6", 600, 400);
+  //c6->cd();
+  h_ts_start->SetLineColor(kRed);
+  h_ts_start->Draw("SAME");
+
 
   for (int k = 0; k < Nvar; k++)
   {
-    // Get histogram boundary
-    double m1 = Plot_ex[k]->GetMaximum();
-    double m2 = 0;
-    if (Plot_al[k]->Integral() > 0 && Plot_in[k]->Integral() > 0)
-      Plot_al[k]->Scale(Plot_in[k]->Integral() / Plot_al[k]->Integral());
-    m2 = Plot_al[k]->GetMaximum();
-    if (m1 < m2)
-      m1 = m2;
-    Plot_ex[k]->SetMaximum(1.1 * m1);
-    // Plot them
-    PP->cd(k + 1);
-    Plot_ex[k]->Draw();
-    Plot_in[k]->Draw("SAME");
-    Plot_si[k]->Draw("SAME");
-    Plot_al[k]->Draw("SAME");
-  }
 
-  for (int k = 0; k < NADplot; k++)
-  {
-    // Get histogram boundary
-    double m1 = OPlot_in[k]->GetMaximum();
-    double m2 = 0;
-    if (OPlot_al[k]->Integral() > 0 && OPlot_in[k]->Integral() > 0)
-      OPlot_al[k]->Scale(OPlot_in[k]->Integral() / OPlot_al[k]->Integral());
-    m2 = OPlot_al[k]->GetMaximum();
-    if (m1 < m2)
-      m1 = m2;
-    OPlot_in[k]->SetMaximum(1.1 * m1);
-    // Plot them
-    OP->cd(k + 1);
-    OPlot_in[k]->Draw();
-    OPlot_si[k]->Draw("SAME");
-    OPlot_al[k]->Draw("SAME");
+    gROOT->Time();
+    return;
   }
-
-  for (int k = 0; k < Nvar; k++)
-  {
-    // Get histogram boundary
-    double m1 = UPlot_ex[k]->GetMaximum();
-    double m2 = 0;
-    if (UPlot_al[k]->Integral() > 0 && UPlot_in[k]->Integral() > 0)
-      UPlot_al[k]->Scale(UPlot_in[k]->Integral() / UPlot_al[k]->Integral());
-    m2 = UPlot_al[k]->GetMaximum();
-    if (m1 < m2)
-      m1 = m2;
-    UPlot_ex[k]->SetMaximum(1.1 * m1);
-    // Plot them
-    UP->cd(k + 1);
-    UPlot_ex[k]->Draw();
-    UPlot_in[k]->Draw("SAME");
-    UPlot_si[k]->Draw("SAME");
-    UPlot_al[k]->Draw("SAME");
-  }
-
-  // Plot chosen features for all events and chosen events - 2D plots
-  // ----------------------------------------------------------------
-  if (ind > 98)
-    ind = 98; // max number of plots
-  if (ind <= 15)
-  {
-    P2->Divide(6, 5);
-  }
-  else if (ind <= 30)
-  {
-    P2->Divide(10, 6);
-  }
-  else if (ind <= 50)
-  {
-    P2->Divide(10, 10);
-  }
-  else
-  {
-    P2->Divide(14, 15); // max is 15x14 variables to plot
-  }
-  for (int i = 0; i < ind; i++)
-  {
-    P2->cd(2 * i + 1);
-    SCP_al[i]->Draw("BOX");
-    P2->cd(2 * i + 2);
-    SCP_ex[i]->Draw("BOX");
-    SCP_in[i]->Draw("BOXSAME");
-  }
-
-  if (ind <= 15)
-  {
-    OP2->Divide(6, 5);
-  }
-  else if (ind <= 30)
-  {
-    OP2->Divide(10, 6);
-  }
-  else if (ind <= 50)
-  {
-    OP2->Divide(10, 10);
-  }
-  else
-  {
-    OP2->Divide(14, 15); // max is 15x14 variables to plot
-  }
-  for (int i = 0; i < ind; i++)
-  {
-    OP2->cd(2 * i + 1);
-    OSCP_al[i]->Draw("BOX");
-    OP2->cd(2 * i + 2);
-    OSCP_in[i]->Draw("BOXSAME");
-  }
-
-  if (ind <= 15)
-  {
-    UP2->Divide(6, 5);
-  }
-  else if (ind <= 30)
-  {
-    UP2->Divide(10, 6);
-  }
-  else if (ind <= 50)
-  {
-    UP2->Divide(10, 10);
-  }
-  else
-  {
-    UP2->Divide(14, 15);
-  }
-  for (int i = 0; i < ind; i++)
-  {
-    UP2->cd(2 * i + 1);
-    USCP_al[i]->Draw("BOX");
-    UP2->cd(2 * i + 2);
-    USCP_ex[i]->Draw("BOX");
-    USCP_in[i]->Draw("BOXSAME");
-  }
-
-  TCanvas *Vars = new TCanvas("Vars", "", 500, 500);
-  Vars->Divide(3, 4);
-  Vars->cd(1);
-  Zvalue_in->Draw();
-  Vars->cd(2);
-  Zvalue_fi->Draw();
-  Vars->cd(3);
-  InitialDensity->Draw();
-  Vars->cd(4);
-  NClomax->Draw();
-  Vars->cd(5);
-  Bounds_in->Draw();
-  Vars->cd(6);
-  Bounds_fi->Draw();
-  Vars->cd(7);
-  Drift->Draw();
-  Vars->cd(8);
-  NGDsteps->Draw();
-  Vars->cd(9);
-  Ninbox_in->Draw();
-  Ninbox_fi->SetLineColor(kRed);
-  Ninbox_fi->Draw("SAME");
-  Vars->cd(10);
-  Ninbox_in_vs_fi->Draw();
-  Vars->cd(11);
-  InitialDensity->Draw();
-  Vars->cd(12);
-  InitialVolume->Draw();
-
-  // Write histograms to root file
-  // -----------------------------
-  TFile *out = new TFile(rootfile.c_str(), "RECREATE");
-  out->cd();
-  Zvalue_in->Write();
-  Zvalue_fi->Write();
-  Bounds_in->Write();
-  Bounds_fi->Write();
-  Drift->Write();
-  NGDsteps->Write();
-  Ninbox_in->Write();
-  Ninbox_fi->Write();
-  Ninbox_in_vs_fi->Write();
-  InitialDensity->Write();
-  InitialVolume->Write();
-  NClomax->Write();
-  ZH0->Write();
-  ZvsOrder->Write();
-  //Z_maxR->Write();
-  //maxR_vs_Z->Write();
-
-  for (int k = 0; k < NAD; k++)
-  {
-    Plot_al[k]->Write();
-    Plot_in[k]->Write();
-    Plot_ex[k]->Write();
-    Plot_si[k]->Write();
-    UPlot_al[k]->Write();
-    UPlot_in[k]->Write();
-    UPlot_ex[k]->Write();
-    UPlot_si[k]->Write();
-    OPlot_al[k]->Write();
-    OPlot_in[k]->Write();
-    OPlot_si[k]->Write();
-  }
-  for (int k = 0; k < Nvar * (Nvar - 1) / 2; k++)
-  {
-    SCP_al[k]->Write();
-    SCP_in[k]->Write();
-    SCP_ex[k]->Write();
-    USCP_al[k]->Write();
-    USCP_in[k]->Write();
-    USCP_ex[k]->Write();
-    OSCP_al[k]->Write();
-    OSCP_in[k]->Write();
-  }
-  // Canvases now
-  PP->Write();
-  OP->Write();
-  UP->Write();
-  P2->Write();
-  OP2->Write();
-  UP2->Write();
-  Vars->Write();
-
-  // Close root file
-  // ---------------
-  out->Close();
-
-} // end if plots
-
-// Plot test statistic if requested
-// --------------------------------
-if (NH0 > 1)
-{
-  TCanvas *H0 = new TCanvas("H0", "", 500, 300);
-  H0->cd();
-  ZH0->Draw();
-
-  // Determine quantiles of TS
-  // -------------------------
-  int s = 0;
-  double alpha = 0.05;
-  double centrmin = 0.1586;
-  double centrmax = 0.8414;
-  double centr = 0.5;
-  double integral = 0.;
-  double x = 0.;
-  double xcmin = 0.;
-  double xcmax = 0.;
-  double xc = 0.;
-  double xalpha = 0.;
-  for (int ix = 0; ix < 1000; ix++)
-  {
-    s += ZH0->GetBinContent(ix + 1);
-    x = 0.1 * ix;
-    if (s >= NH0 * centrmin && xcmin == 0.)
-      xcmin = x;
-    if (s >= NH0 * centr && xc == 0.)
-      xc = x;
-    if (s >= NH0 * centrmax && xcmax == 0.)
-      xcmax = x;
-    if (s >= NH0 * (1 - alpha) && xalpha == 0.)
-      xalpha = x;
-  }
-  cout << endl;
-  cout << "  Central interval of Z distribution: [" << xcmin << " " << xc << " " << xcmax << "]" << endl;
-  cout << "  Critical region: Z> " << xalpha << endl;
-  cout << "  Mean Z = " << ZH0->GetMean() << " +- " << ZH0->GetRMS() / sqrt(NH0 - 1) << endl;
-  cout << endl;
-  results << endl;
-  results << "  id = " << id;
-  results << "  Central interval of Z distribution: [" << xcmin << " " << xc << " " << xcmax << "]" << endl;
-  results << "  Critical region: Z> " << xalpha << endl;
-  results << "  Mean Z = " << ZH0->GetMean() << " +- " << ZH0->GetRMS() / sqrt(NH0 - 1) << endl;
-  results << endl;
-  summary << endl;
-  summary << "  id = " << id;
-  summary << "  Central interval of Z distribution: [" << xcmin << " " << xc << " " << xcmax << "]" << endl;
-  summary << "  Critical region: Z> " << xalpha << endl;
-  summary << "  Mean Z = " << ZH0->GetMean() << " +- " << ZH0->GetRMS() / sqrt(NH0 - 1) << endl;
-  summary << endl;
-}
-
-results.close();
-summary.close();
-
-// here it's plotted the R1 statistic
-TCanvas *c1 = new TCanvas("c1", "canv1", 600, 400);
-c1->cd();
-h_sup->Draw();
-
-for (int k = 0; k < Nvar; k++)
-{
-
-  gROOT->Time();
-  return;
-}
 } // END MACRO	// aggiunta graffa per chiudere la void Ranbox
-
