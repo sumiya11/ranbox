@@ -5,6 +5,6 @@
 #pragma link C++ nestedclasses;
 #pragma link C++ nestedtypedefs;
 
-#pragma link C++ defined_in "C:/data/projects/cern/ranbox/RanBox.C";
+#pragma link C++ defined_in "C:/data/projects/ph/ranbox/RanBox.C";
 
 #endif
