@@ -1590,6 +1590,7 @@ for (int i=0; i<goodevents; i+=speedup) {
       d2[k] = pow(position_i[k]-position_j,2);
       sumd2 += d2[k];
     }
+    // too small D2kernel !
     SumKernels += exp(-sumd2/D2kernel); // add gauss Kernels if point is close
   } // end ii loop
   if (SumKernels>maxSum) {
@@ -1608,7 +1609,7 @@ for (int k=0; k<Nvar; k++) {
     Blockmax[k] = 2*halfwidth;
   } else if (Blockmax[k]>1.) {
     Blockmin[k] = 1.-2*halfwidth;
-    Blockmax[k] = 1.;
+    Blockmax[k] = 1.; // ?
   }
   VolumeOrig *= fabs(Blockmax[k]-Blockmin[k]);
 } 
@@ -2071,8 +2072,8 @@ if (c_ZPL_R2_SvsBKG==0) {
   Nexp = Nside;
   sup = Sup_approx((double) Nexp, (double) Nexp);
   eff = ((double) Nin) / goodevents;
-  // Zval_start = UpperLimitTS(sup, eff); // #MODIFICA NEL COMPUTO DI SVSBKG 6/10
-  Zval_start = sup;
+  Zval_start = UpperLimitTS(sup, eff); //
+  // Zval_start = sup;
   cout << "Zval_start = " << Zval_start << endl;
 
   /*
@@ -2123,6 +2124,7 @@ for (int k=0; k<Nvar; k++) {
         // Zval[m] = UpperLimitTS(sup, eff);
         Zval[m] = sup;
         // CHANGED
+
     /*
     if (useSB && Nside_grad[k][m]>0 && VolumeMod[k][m]<0.5) {
       Nexp = Nside_grad[k][m];
