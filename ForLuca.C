@@ -567,7 +567,8 @@ void select_data(int dataset, int &NAD, int &NSEL, double &D2kernel, int Nremove
 {
   if (dataset == 0)
   { // HEPMASS data
-    NAD = 27;
+    // Alex: -> 22 to suit a test file that I have (see below)
+    NAD = 22;
     NSEL = NAD - Nremoved;
   }
   else if (dataset == 1)
@@ -984,7 +985,7 @@ bool covariance_matrix(int Gaussian_dims, bool fixed_gaussians, bool narrow_gaus
   return true;
 }
 
-void RanBox2files(int dataset = 0, int Ntrials = 1000, int Nsignal = 200, int Nbackground = 9800, int Algorithm = 5, bool useZPL = false,
+void RanBox2files(int dataset = 0, int Ntrials = 1000, int Nsignal = 200, int Nbackground = 9800, int Algorithm = 0, bool useZPL = false,
                   bool useSB = true, bool PCA = false, int Nvar = 8, int Nremoved = 0, int speedup = 1, int NH0 = 1, int c_ZPL_R2_SvsBKG = 2, bool one_off = false)
 {
   //int dataset=0; int Ntrials=352; int Nsignal=10; int Nbackground=10; int Algorithm=5; bool useZPL=false;
@@ -1020,6 +1021,8 @@ void RanBox2files(int dataset = 0, int Ntrials = 1000, int Nsignal = 200, int Nb
   int NAD;
   int NSEL;
   select_data(dataset, NAD, NSEL, D2kernel, Nremoved, mock);
+
+  cout << "select_data: " << NAD << " " << NSEL << '\n';
 
   // Change preset generator: NB other versions of TRandom are flawed, id: Identifier for summary printouts
   // ------------------------------------------------------------------------------
@@ -1291,10 +1294,19 @@ void RanBox2files(int dataset = 0, int Ntrials = 1000, int Nsignal = 200, int Nb
   double f[ND];
   int Nvoided = 0;
 
+  /*
+Alex: It looks to me we are reading into two separate arrays, aren't we?
+*/
+
+  /*
+
+*/
+
   // Start of loop
   // -------------
   int Nsiginfile;
-  dataname = "hepmass_train_5K_signal.csv"; //"dummytaufile.txt";
+
+  dataname = "signal_shtuki.csv"; //"dummytaufile.txt";
   events.open(dataname);
   // First line has number of events contained in file
   events >> Nsiginfile;
@@ -1343,11 +1355,24 @@ void RanBox2files(int dataset = 0, int Ntrials = 1000, int Nsignal = 200, int Nb
     }
   } // End main for loop
 
-  goodevents_signal = Nsignal;
+  cout << "\n#### SIGNAL ####\n";
+  for (int uu = 0; uu < goodevents_signal; uu++)
+  {
+    for (int vv = 0; vv < NAD; vv++)
+    {
+      cout << feature_signal[vv][uu] << " ";
+    }
+    cout << '\n';
+  }
+  cout << "################\n";
+
+  // goodevents_signal = Nsignal;
+  goodevents_signal = goodevents_signal;
+  Nsignal = goodevents_signal;
 
   events.close();
 
-  // feature_signal[4][4] // what is this????
+  // feature_signal[4][4] // what is this???? // LOL
 
   // READ BCKG FILE
   Nbackground = 500;
@@ -1364,7 +1389,7 @@ void RanBox2files(int dataset = 0, int Ntrials = 1000, int Nsignal = 200, int Nb
   // Start of loop
   // -------------
   int Nbgrinfile;
-  dataname = "hepmass_train_5K_signal_tf.csv"; //"dummytaufile.txt";
+  dataname = "background_shtuki.csv"; //"dummytaufile.txt";
   events.open(dataname);
   // First line has number of events contained in file
   events >> Nbgrinfile;
@@ -1413,9 +1438,24 @@ void RanBox2files(int dataset = 0, int Ntrials = 1000, int Nsignal = 200, int Nb
     }
   } // End main for loop
 
-  goodevents_background = Nbackground;
-
+  // goodevents_background = Nbackground;
+  goodevents_background = goodevents_background;
+  Nbackground = goodevents_background;
   events.close();
+
+  cout << "\n#### BACK ####\n";
+  for (int uu = 0; uu < goodevents_background; uu++)
+  {
+    for (int vv = 0; vv < NAD; vv++)
+    {
+      cout << feature_background[vv][uu] << " ";
+    }
+    cout << '\n';
+  }
+  cout << "################\n";
+
+  // Alex: placeholder for now
+  int goodevents = goodevents_background + goodevents_signal;
 
   if (PCA)
     cout << "  "; // offsets printout of pca file
@@ -1446,16 +1486,22 @@ for (int dim=0; dim<NAD; dim++) {
   }
 */
 
+  /*
+Alex: Why do we need this?
+*/
   // Additional preprocessing step to avoid large discontinuities in support affecting the PCA step:
   // We loop on each feature and create N-bin histograms, then if a bin is empty we move all data
   // to the right of the bin down by the bin width, "filling the gap". This is iterated until all
   // empty space (within a coarseness of a factor 2^13 from original [0,1] support of standardized
   // features is removed from the support of the features.
   // ----------------------------------------------------------------------------------------------
+
+  // Alex: let us skip compactify
+  cout << "\n#### COMPACTIFY? " << compactify << " ####\n";
   if (compactify)
   {
     int c[4096];
-    for (int Niter = 1; Niter < 13; Nziter++)
+    for (int Niter = 1; Niter < 13; Niter++)
     {
       float binwidth = 1. / pow(2, Niter);
       for (int dim = 0; dim < NAD; dim++)
@@ -1511,8 +1557,9 @@ for (int dim=0; dim<NAD; dim++) {
     }
   } // end if compactify
 
-  // goodevents		// what is this?????
-
+  // goodevents		// what is this????? // xd
+  // Alex: let us skip PCA
+  cout << "\n#### PCA? " << PCA << " ####\n";
   if (PCA)
   {
 
@@ -1588,6 +1635,8 @@ for (int dim=0; dim<NAD; dim++) {
   // End of principal component analysis
   ////////////////////////////////////////////////////////////////////////////
 
+  // Alex: let us skip RemoveHighCorr
+  cout << "\n#### RemoveHighCorr? " << RemoveHighCorr << " ####\n";
   // We may decide to remove the Nremoved<NAD variables which have the highest correlation, by identifying the
   // set which, once removed, leaves the smallest highest correlation among the remaining ones
   // ---------------------------------------------------------------------------------------------------------
@@ -1794,60 +1843,68 @@ for (int dim=0; dim<NAD; dim++) {
 
   // Sort data
   // ---------
-  cout << "  Sorting data:     " << progress[0];
-  currchar = 1;
-  int itmp;
-  double dtmp;
-  for (int dim = 0; dim < NAD; dim++)
+
+  bool SORT_DATA = false;
+  // Alex: let us skip sorting
+  cout << "\n#### SORT_DATA? " << SORT_DATA << " ####\n";
+  if (SORT_DATA)
   {
-    // Print out progress in nice format
-    // ---------------------------------
-    if (currchar > 52)
-      currchar -= 53;
-    cout << progress[currchar];
-    currchar++;
-
-    for (int i = 0; i < goodevents; i++)
+    cout << "  Sorting data:     " << progress[0];
+    currchar = 1;
+    int itmp;
+    double dtmp;
+    for (int dim = 0; dim < NAD; dim++)
     {
-      xtmp[i] = feature[dim][i];
-      cum_ind[i] = i;
-    }
+      // Print out progress in nice format
+      // ---------------------------------
+      if (currchar > 52)
+        currchar -= 53;
+      cout << progress[currchar];
+      currchar++;
 
-    for (int times = 0; times < goodevents; times++)
-    {
-      for (int i = goodevents - 1; i > 0; i--)
+      for (int i = 0; i < goodevents; i++)
       {
-        if (xtmp[i] < xtmp[i - 1])
-        {
-          dtmp = xtmp[i - 1];
-          xtmp[i - 1] = xtmp[i];
-          xtmp[i] = dtmp;
-          itmp = cum_ind[i - 1];
-          cum_ind[i - 1] = cum_ind[i];
-          cum_ind[i] = itmp;
-        }
+        xtmp[i] = feature[dim][i];
+        cum_ind[i] = i;
       }
 
-    } // End times loop
-
-    for (int i = 0; i < goodevents; i++)
-    {
-      order_ind[dim][i] = -1;
-      for (int j = 0; j < goodevents && order_ind[dim][i] == -1; j++)
+      for (int times = 0; times < goodevents; times++)
       {
-        if (cum_ind[j] == i)
+        for (int i = goodevents - 1; i > 0; i--)
         {
-          order_ind[dim][i] = j;
+          if (xtmp[i] < xtmp[i - 1])
+          {
+            dtmp = xtmp[i - 1];
+            xtmp[i - 1] = xtmp[i];
+            xtmp[i] = dtmp;
+            itmp = cum_ind[i - 1];
+            cum_ind[i - 1] = cum_ind[i];
+            cum_ind[i] = itmp;
+          }
+        }
+
+      } // End times loop
+
+      for (int i = 0; i < goodevents; i++)
+      {
+        order_ind[dim][i] = -1;
+        for (int j = 0; j < goodevents && order_ind[dim][i] == -1; j++)
+        {
+          if (cum_ind[j] == i)
+          {
+            order_ind[dim][i] = j;
+          }
         }
       }
-    }
-  } // End of sorting loop
+    } // End of sorting loop
 
-  for (int c = currchar; c < 52; c++)
-    cout << progress[c];
-  cout << endl
-       << endl; // End of progress string
+    for (int c = currchar; c < 52; c++)
+      cout << progress[c];
+    cout << endl
+         << endl; // End of progress string
+  }
 
+  // Alex: Lets assume there Ntrials == 1 for now
   // Start of trials
   // ---------------
   for (int trial = 0; trial < Ntrials; trial++)
@@ -1868,7 +1925,10 @@ for (int dim=0; dim<NAD; dim++) {
 
     // Decide what variables will be looked at in this trial
     // -----------------------------------------------------
-
+    NseedTrials = 0; // to block one if branch below
+    cout << "\n#### SUBSPACE CHOICE ####\n";
+    cout << "one_off = " << one_off << ", doall = " << doall << ", nseedtrials = " << NseedTrials << '\n';
+    cout << "###########\n";
     if (one_off)
     {
       // Fix ivar list, for debug purposes
@@ -1938,6 +1998,7 @@ for (int dim=0; dim<NAD; dim++) {
         }
       }
     }
+    // Alex: we do this!
     else
     { // If NseedTrials>1 we test the same condition with different settings
       for (int k = 0; k < Nvar; k++)
@@ -1945,6 +2006,13 @@ for (int dim=0; dim<NAD; dim++) {
         Ivar[k] = k;
       }
     }
+    // Alex: now Ivar stores selected variables
+    cout << "\n#### SUBSPACE DIM " << Nvar << " ####\n";
+    cout << "VARIABLES SELECTED: ";
+    for (int k = 0; k < Nvar; k ++) {
+      cout << Ivar[k] << " ";
+    }
+    cout << "\n###############\n";
 
     ////////////////////////////////
     // Choose initial box
@@ -2029,11 +2097,53 @@ for (int dim=0; dim<NAD; dim++) {
         VolumeOrig *= fabs(Blockmax[k] - Blockmin[k]);
       }
     }
+    // Alex: hardcode this Algorithm 0 for now
+    else if (Algorithm == 0)
+			{
+
+				// - The random way
+				// ----------------
+				// Random interval in [0,1] has length 1/3
+				// we choose random box to have expected volume
+				// such that on average 10 events are in it.
+				// This means using [0,1] range in all coords but
+				// using x = log(10/Ntot) / log(1/3) random intervals
+				// --------------------------------------------------
+				double Nvar_box = (log(10. / goodevents) / log(1. / 3));
+				if (Nvar_box > Nvar)
+					Nvar_box = Nvar;
+				VolumeOrig = 1.;
+				int nonfull = (int)gRandom->Uniform(0., Nvar - epsilon);
+				for (int k = 0; k < Nvar; k++)
+				{
+
+					// The one below ensures that a move may catch a signal even if it's in the boundaries.
+					if (k == nonfull)
+					{
+						Blockmin[k] = epsilon * (int)(InvEpsilon * gRandom->Uniform(0., 0.5));
+						Blockmax[k] = 0.5 + Blockmin[k];
+						VolumeOrig = VolumeOrig * fabs(Blockmax[k] - Blockmin[k]);
+					}
+					else
+					{
+						Blockmin[k] = 0.;
+						Blockmax[k] = 1.;
+					}
+				}
+			}
     else
     {
       cout << "  Choice of algorithm not allowed. Exiting. " << endl;
       return;
     } // end choice of algorithm
+
+    cout << "\n#### INITIAL BOX ####\n";
+    for (int uu = 0; uu < Nvar; uu ++) {
+      cout << "min[" << uu << "] = " << Blockmin[uu] << ", ";
+      cout << "max[" << uu << "] = " << Blockmax[uu] << ", ";
+      cout << '\n';
+    }
+    cout << "####################\n";
 
     // If Volume is too large, reduce uniformly
     // Delta' = Delta/RF
@@ -2073,6 +2183,14 @@ for (int dim=0; dim<NAD; dim++) {
       }
     }
 
+    cout << "\n#### SHRINKED BOX ####\n";
+    for (int uu = 0; uu < Nvar; uu ++) {
+      cout << "min[" << uu << "] = " << Blockmin[uu] << ", ";
+      cout << "max[" << uu << "] = " << Blockmax[uu] << ", ";
+      cout << '\n';
+    }
+    cout << "####################\n";
+
     if (debug)
     {
       for (int k = 0; k < Nvar; k++)
@@ -2105,6 +2223,7 @@ for (int dim=0; dim<NAD; dim++) {
 
     // Initialize variables before loop over data
     // ------------------------------------------
+    // So, who is lambda hm,m..
     double lambda[maxNvar][6];
     // double lambdatmp[maxNvar][4];
     for (int k = 0; k < Nvar; k++)
@@ -2150,6 +2269,8 @@ for (int dim=0; dim<NAD; dim++) {
     // ---------------------
     for (int gd = 0; gd < maxGDLoops; gd++)
     {
+
+      cout << "\n#### GRAD ITER " << gb << " ####" << '\n';
 
       determineSB(Sidemin, Sidemax, Blockmin, Blockmax, Nvar);
       determinesecondSB(secondsidemin, secondsidemax, Sidemin, Sidemax, Nvar);
